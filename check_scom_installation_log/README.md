@@ -1,4 +1,4 @@
--check if installation completed succesfully (info from SCOM installation log)
+-checks on remote machines if installation completed succesfully (info from SCOM installation log)
 
 SCOM logs are located in: %LocalAppData%\SCOM\Logs\
 
