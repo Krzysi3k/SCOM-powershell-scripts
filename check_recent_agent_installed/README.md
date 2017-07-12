@@ -1,3 +1,3 @@
 # check recently installed agents
 
--check recently installed agents from 
+-check recently installed agents and get the status
