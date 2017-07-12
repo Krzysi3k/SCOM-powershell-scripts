@@ -111,4 +111,3 @@ Function run-main
 		send-notification -attachement $del_log
 	}
 }
-#EOF
