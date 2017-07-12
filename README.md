@@ -1,2 +1,2 @@
-# SCOM pwoershell scripts
-varies automation powershell scripts for System Center Operations Manager 2012 R2
+# SCOM PowerShell scripts
+varies automation PowerShell scripts for System Center Operations Manager 2012 R2
