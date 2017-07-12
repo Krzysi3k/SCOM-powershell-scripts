@@ -1,3 +1,4 @@
+# Repair heartbeat failure
 -scripts repairs remote machines with heartbeat failure (clean healthstate by removing content of "Health Service Store" folder)
 
 -script requires PsService.exe application, read more about PsTools here:
