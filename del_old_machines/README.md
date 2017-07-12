@@ -7,5 +7,5 @@
 
 how to run:
 
-powershell.exe -file .\remove_offline_machines.ps1;run-main
+powershell.exe -command "import-module .\remove_offline_machines.ps1;run-main"
 
