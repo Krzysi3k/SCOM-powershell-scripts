@@ -1,7 +1,7 @@
 
 # approve pending management
 
--approves pending management if online
+-approves pending management if online and notify by e-mail
 
 how to run:
 
