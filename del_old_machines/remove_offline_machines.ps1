@@ -1,8 +1,3 @@
-##############################
-# delete obsolete SCOM agents#
-# for SCOM 2012 R2           #
-# created by Krzysi3k        #
-##############################
 
 # write output with current date time:
 function log-output
