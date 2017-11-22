@@ -68,14 +68,10 @@ function ping-machines
 	{
 		Start-Process powershell.exe -ArgumentList "Import-Module $currpth\repair_hb_failure_v2.0.ps1;repair-SCOM-agent $computer" -NoNewWindow
 		Start-Sleep -Milliseconds 500
-		if((Get-Process -Name powershell).count -gt 10)
+		While((Get-Process -Name powershell).count -ge 10)
 		{
-			Do
-			{
-				Start-Sleep -Milliseconds 250
-			}
-			While((Get-Process -Name powershell).count -ge 10)
-		}
+			Start-Sleep -Milliseconds 250
+		}	
 	}
 }
 
