@@ -50,56 +50,79 @@ Function run-main
     }
 	
 	$notify = $false
-    $logpth = "D:\scripts\delete_old_machines_from_SCOM\do_not_remove"
     $hb_failure = Get-SCOMClass -name Microsoft.SystemCenter.Agent | Get-SCOMMonitoringObject | Where-Object {$_.InMaintenanceMode -eq $false -and $_.IsAvailable -eq $false}
 
-    # remove online machines from catalog:
-	$list = ls -Path $logpth -Filter "*.log"
-	$list = ($list.Name).trim(".log")
-	foreach($l in $list)
-	{
-		if(Test-Connection -ComputerName $l -Count 1 -ErrorAction SilentlyContinue)
-		{
-			Write-Verbose "pc: $l is online - removing log file"
-			ls -Path "$logpth\$l*" | Remove-Item -Force
-		}
-	}
-	
-	# verify machines that failed to heartbeat:
-    foreach($i in $hb_failure)
+    # ping all machines from json file (as Job)
+    $json_file = Get-Content -Raw "D:\scripts\delete_old_machines_from_SCOM\machines.json"
+    $json_obj = $json_file | ConvertFrom-Json
+    $jobs = @()
+    for ($i = 0; $i -le $json_obj.machines.PSobject.Properties.Name.Count -1; $i++)
     {
-        if(Test-Connection $i.DisplayName -Count 1 -ErrorAction SilentlyContinue)
+        $connection = Test-Connection -ComputerName $json_obj.machines.PSobject.Properties.Name[$i] -Count 1 -AsJob -ErrorAction SilentlyContinue
+        $jobs += $connection
+    }
+
+    while ($jobs.State -eq "Running")
+    {
+        Start-Sleep -Milliseconds 500
+    }
+
+    $job_result = Receive-Job $jobs
+    [System.Collections.ArrayList]$online_list = @()
+    foreach ($j in $job_result)
+    {
+        switch ($j.StatusCode)
         {
-            Write-Verbose "connection ok $i trying to remove log file..."
-		    ls -Path "$logpth\$($i.DisplayName)*" | Remove-Item -Force
+            0 {Write-Verbose "machine is online: $(($j).Address)"; $null=$online_list.Add(($j).Address)}
+            Default {Write-Verbose "machine is offline: $(($j).Address)"}
         }
-        else
+    }
+    # remove all online machines from json:
+    foreach($comp in $online_list)
+    {
+        Write-Verbose "removing $comp from json..."
+        $json_obj.machines.PSobject.Properties.Remove($comp)
+    }
+    
+    $last_month = (Get-Date).AddDays(-30)
+    $curr_date = Get-Date
+	# verify machines that failed to heartbeat:
+    foreach($hb in $hb_failure)
+    {
+        if(Test-Connection -ComputerName $hb.DisplayName -Count 1 -ErrorAction SilentlyContinue) 
         {
-            Write-Verbose "connection failed $i now check file log..."
-            $filecheck = ls -Path "$logpth\$($i.DisplayName)*" -ErrorAction SilentlyContinue
-            if($filecheck)
+            Write-Verbose "hb failure but online: $($hb.DisplayName)"
+        }
+        else 
+        {
+            $pc_name = $hb.DisplayName
+            $pc_name = $pc_name.Substring(0,$pc_name.Length -22)
+            if($json_obj.machines.PSobject.Properties.Name -contains $pc_name -eq $true)
             {
-                if((Get-Date).AddDays(-20) -gt $filecheck.CreationTime)
+                # check date and remove if older than 30 days
+                if([datetime]::Parse($json_obj.machines.$pc_name) -lt $last_month)
                 {
-                    Write-Verbose "filecheck log older than 30 days $($filecheck.Name) `nremovinglog + agent"
-                    # remove machine from SCOM + remove log file + add info to log file
-				    $filecheck | Remove-Item -Force
-				    $del_log = "D:\scripts\delete_old_machines_from_SCOM\del_log.log"
-				    log-output "removing pc: $($i.DisplayName)" | Out-File $del_log -Append
-                    $agentFQDN = $i.DisplayName
+                    Write-Verbose "$pc_name is older than 30 days, removing..."
+                    $json_obj.machines.PSobject.Properties.Remove($pc_name)
+                    $del_log = "D:\scripts\delete_old_machines_from_SCOM\del_log.log"
+                    log-output "removing pc: $pc_name" | Out-File $del_log -Append
+                    $agentFQDN = $pc_name + ".statoilfuelretail.com"
                     Delete-SCOMagent -agentFQDN $agentFQDN
-                    Write-Verbose "agent $agentFQDN has been removed..."
-					$notify = $true
+                    Write-Verbose "agent $pc_name has been removed..."
+                    $notify = $true
                 }
             }
             else
             {
-                # create file
-                Write-Verbose "filecheck log does not exist - creating new file"
-                New-Item -Path "$logpth\$($i.DisplayName).log" -Type file -Force
+                Write-Verbose "adding $pc_name to json file..."
+                $json_obj.machines | Add-Member -MemberType NoteProperty -Name $pc_name -Value $curr_date.ToShortDateString()
             }
         }
     }
+
+    # save json file:
+    $json_obj = $json_obj | ConvertTo-Json
+    $json_obj | Out-File "D:\scripts\delete_old_machines_from_SCOM\machines.json" -Force
 	
 	if($notify -eq $true)
 	{
