@@ -1,3 +1,5 @@
+# delete obsolete SCOM agents
+# for SCOM 2012 R2                    
 
 # write output with current date time:
 function log-output
@@ -9,25 +11,25 @@ function log-output
 function send-notification
 {
     Param([string]$attachement)
-    $smtp = 'yoursmtpserver.domain.com'
-    $from = 'sender@domain.com'
-    $to = 'recipient@domain.com'
+    $smtp = 'smtp.domain.com'
+    $from = 'from@domain.com'
+    $to = 'to@domain.com'
     $body = @()
     $body += "machines removed:`n"
     $body += Get-Content $attachement | Where-Object {$_ -match (Get-Date -Format "yyyy-MM-dd")}
     $body = $body | Out-String
-    Send-MailMessage -SmtpServer $smtp -From $from -To $to -Subject 'removed obsolete machines that were offline more than 20 days' -Body $body -Attachments $attachement
+    Send-MailMessage -SmtpServer $smtp -From $from -To $to -Subject 'removed obsolete machines that were offline more than 30 days' -Body $body -Attachments $attachement
 }
 
-function Delete-SCOMagent($agentFQDN)
+function Delete-SCOMagent($agents)
 {
 	# function to remove obsolete machines
-	# example: Delete-SCOMagent -agentFQDN agent_name.domain.com
+	# example: Delete-SCOMagent -agents $ListofAgents
 	
     [System.Reflection.Assembly]::LoadWithPartialName("Microsoft.EnterpriseManagement.OperationsManager.Common") 
 	[System.Reflection.Assembly]::LoadWithPartialName("Microsoft.EnterpriseManagement.OperationsManager")
 
-	$MGConnSetting = New-Object Microsoft.EnterpriseManagement.ManagementGroupConnectionSettings("management_server_name") 
+	$MGConnSetting = New-Object Microsoft.EnterpriseManagement.ManagementGroupConnectionSettings("SFRFIDCSCOM012P") 
 	$MG = New-Object Microsoft.EnterpriseManagement.ManagementGroup($MGConnSetting) 
 	$Admin = $MG.Administration
 
@@ -36,8 +38,12 @@ function Delete-SCOMagent($agentFQDN)
 	$genericList = $genericListType.MakeGenericType($agentManagedComputerType) 
 	$agentList = new-object $genericList.FullName
 
-    $agent = Get-SCOMAgent -DNSHostName $agentFQDN -ComputerName management_server_name
-    $agentList.Add($agent);
+    foreach($i in $agents)
+    {
+        $agent = Get-SCOMAgent -DNSHostName $i -ComputerName SFRFIDCSCOM012P
+        $agentList.Add($agent);
+    }
+
     $Admin.DeleteAgentManagedComputers($agentList)
 }
 
@@ -82,10 +88,12 @@ Function run-main
     {
         Write-Verbose "removing $comp from json..."
         $json_obj.machines.PSobject.Properties.Remove($comp)
+        log-output -text $comp | Out-File D:\scripts\delete_old_machines_from_SCOM\removed_from_json.log -Append
     }
     
-    $last_month = (Get-Date).AddDays(-30)
+    $last_month = (Get-Date).AddDays(-20)
     $curr_date = Get-Date
+    [System.Collections.ArrayList]$agents = @()
 	# verify machines that failed to heartbeat:
     foreach($hb in $hb_failure)
     {
@@ -106,8 +114,7 @@ Function run-main
                     $json_obj.machines.PSobject.Properties.Remove($pc_name)
                     $del_log = "D:\scripts\delete_old_machines_from_SCOM\del_log.log"
                     log-output "removing pc: $pc_name" | Out-File $del_log -Append
-                    $agentFQDN = $pc_name + ".statoilfuelretail.com"
-                    Delete-SCOMagent -agentFQDN $agentFQDN
+                    $agents.Add($pc_name + ".statoilfuelretail.com")
                     Write-Verbose "agent $pc_name has been removed..."
                     $notify = $true
                 }
@@ -119,7 +126,11 @@ Function run-main
             }
         }
     }
-
+    # delete agents:
+    if($agents.Count -gt 0)
+    {
+        Delete-SCOMagent -agents $agents
+    }
     # save json file:
     $json_obj = $json_obj | ConvertTo-Json
     $json_obj | Out-File "D:\scripts\delete_old_machines_from_SCOM\machines.json" -Force
