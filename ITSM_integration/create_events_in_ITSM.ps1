@@ -15,7 +15,7 @@ $2ndline = "IT Retail 2nd"
 $1stline = "Retail Service Desk"
 $team = "unknown"
 
-if(($src.Split('\') | select -First 1) -match 'statoilfuelretail.com')
+if(($src.Split('\') | select -First 1) -match 'domain.com')
 {
 	$pcname = $src.Split('\') | Select -First 1
 }
