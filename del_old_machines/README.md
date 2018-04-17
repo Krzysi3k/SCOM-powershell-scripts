@@ -7,6 +7,6 @@
 
 
 how to run:
-```batch
+```powershell
 powershell.exe -command "import-module .\remove_offline_machines.ps1;run-main"
 ```
