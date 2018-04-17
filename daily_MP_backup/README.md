@@ -5,7 +5,7 @@
 -keeps up to 20 zip archives
 
 how to run:
-```batch
+```dosbatch
 cd /d "%~dp0"
 powershell.exe -file .\daily_MP_backup.ps1
 ```
