@@ -10,7 +10,10 @@ function log-output
 
 function send-notification
 {
-    Param([string]$attachement)
+    Param(
+        [string]$attachement,
+        [string]$jsonFileOutput
+    )
     $smtp = 'smtp.domain.com'
     $from = 'from@domain.com'
     $to = 'to@domain.com'
@@ -18,7 +21,7 @@ function send-notification
     $body += "machines removed:`n"
     $body += Get-Content $attachement | Where-Object {$_ -match (Get-Date -Format "yyyy-MM-dd")}
     $body = $body | Out-String
-    Send-MailMessage -SmtpServer $smtp -From $from -To $to -Subject 'removed obsolete machines that were offline more than 30 days' -Body $body -Attachments $attachement
+    Send-MailMessage -SmtpServer $smtp -From $from -To $to -Subject 'removed obsolete machines that were offline more than 20 days' -Body $body -Attachments $attachement,$jsonFileOutput
 }
 
 function Delete-SCOMagent($agents)
@@ -91,7 +94,7 @@ Function run-main
         log-output -text $comp | Out-File D:\scripts\delete_old_machines_from_SCOM\removed_from_json.log -Append
     }
     
-    $last_month = (Get-Date).AddDays(-20)
+    $last_month = (Get-Date).AddDays(-30)
     $curr_date = Get-Date
     [System.Collections.ArrayList]$agents = @()
 	# verify machines that failed to heartbeat:
@@ -133,10 +136,11 @@ Function run-main
     }
     # save json file:
     $json_obj = $json_obj | ConvertTo-Json
-    $json_obj | Out-File "D:\scripts\delete_old_machines_from_SCOM\machines.json" -Force
+    $jsonPath = "D:\scripts\delete_old_machines_from_SCOM\machines.json"
+    $json_obj | Out-File $jsonPath -Force
 	
 	if($notify -eq $true)
 	{
-		send-notification -attachement $del_log
+		send-notification -attachement $del_log -jsonFileOutput $jsonPath
 	}
 }
